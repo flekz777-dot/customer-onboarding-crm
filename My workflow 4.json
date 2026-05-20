@@ -1,0 +1,425 @@
+{
+  "name": "My workflow 4",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-form",
+        "options": {
+          "responseCode": {
+            "values": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8da3fe42-fb20-402c-af72-9ad3f3ba672d",
+      "name": "Webhook",
+      "webhookId": "244a8ff0-d25b-48fa-8472-aac38c7dde73"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3e285a23-9cd6-4019-9ddc-d0668fcc9569",
+              "name": "lead_id",
+              "value": "={{\"lead_\" + $now.toMillis()}}",
+              "type": "string"
+            },
+            {
+              "id": "d1b978c6-2d84-4095-be21-bc116e491adb",
+              "name": "timestamp",
+              "value": "={{$now.toISO()}}",
+              "type": "string"
+            },
+            {
+              "id": "c36b3dd2-bf57-4b5c-ac3d-5db3b6c6b8e8",
+              "name": "name",
+              "value": "={{$json.body.name.trim()}}",
+              "type": "string"
+            },
+            {
+              "id": "2ccce4b4-faec-4020-b9d3-a350a0fe47d5",
+              "name": "email",
+              "value": "={{$json.body.email.trim().toLowerCase()}}",
+              "type": "string"
+            },
+            {
+              "id": "9f46ca17-2948-4888-92ca-53f1a054c45d",
+              "name": "company",
+              "value": "={{$json.body.company.trim()}}",
+              "type": "string"
+            },
+            {
+              "id": "c82fbb6f-ee7c-4154-8475-9974e050e80a",
+              "name": "message",
+              "value": "={{$json.body.message.trim()}}",
+              "type": "string"
+            },
+            {
+              "id": "cb0fa31d-3ea5-4a6c-b98f-14390ae51ba3",
+              "name": "budget",
+              "value": "={{parseFloat($json.body.budget.replace(/[^0-9.]/g, ''))}}",
+              "type": "number"
+            },
+            {
+              "id": "3f406cff-c577-48ae-b4d0-86603ed4dca6",
+              "name": "source",
+              "value": "={{$json.body.source.trim()}}",
+              "type": "string"
+            },
+            {
+              "id": "7994a4c7-0e0a-4c58-9129-cc293fe32b51",
+              "name": "phone",
+              "value": "={{$json.body.phone.toString().replace(/\\D/g, '').replace(/^380/, '+380').replace(/^0/, '+380')}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "cfa1f8e9-9126-4bc9-ab6f-3a01908986f2",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Ти — CRM-асистент. Проаналізуй заявку від потенційного клієнта та поверни ТІЛЬКИ JSON без жодного тексту навколо.\n\nДані заявки:\n- Ім'я: {{$json.name}}\n- Компанія: {{$json.company}}\n- Email: {{$json.email}}\n- Бюджет: {{$json.budget}} USD\n- Повідомлення: {{$json.message}}\n- Джерело: {{$json.source}}\n\nПоверни JSON у такому форматі:\n{\n  \"summary\": \"2-3 речення про суть заявки\",\n  \"score\": \"HOT або WARM або COLD\",\n  \"reason\": \"чому такий score\",\n  \"tags\": [\"тег1\", \"тег2\"]\n}\n\nКритерії score:\n- HOT: бюджет > 1000, є терміновість, чіткий запит\n- WARM: бюджет 300-1000, або запит не до кінця сформований\n- COLD: бюджет < 300, або дуже розмите повідомлення"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "62f028b7-f70d-437e-b758-fae5a3929544",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "YtlwhuleXCmGyGtC",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ai_raw = $input.first().json.output[0].content[0].text;\nconst cleaned = ai_raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\nconst ai = JSON.parse(cleaned);\n\nconst norm = $('Edit Fields').first().json;\n\n// Нормалізація телефону прямо тут\nlet phone = norm.phone.toString().replace(/\\D/g, '');\nif (phone.startsWith('380')) phone = '+' + phone;\nelse if (phone.startsWith('0')) phone = '+38' + phone;\n\nreturn {\n  json: {\n    lead_id:   norm.lead_id,\n    timestamp: norm.timestamp,\n    name:      norm.name,\n    email:     norm.email,\n    phone:     phone,\n    company:   norm.company,\n    message:   norm.message,\n    budget:    norm.budget,\n    source:    norm.source,\n    summary:   ai.summary,\n    score:     ai.score,\n    reason:    ai.reason,\n    tags:      ai.tags.join(', ')\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "158a9c91-e2e9-419b-b962-19eadc694bd8",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1PKWBXnk7xbyUTYQdL8palwiWMGJO9z77SbQ357blQFs",
+          "mode": "list",
+          "cachedResultName": "MindFlow — Lead Processing",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PKWBXnk7xbyUTYQdL8palwiWMGJO9z77SbQ357blQFs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Лист1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PKWBXnk7xbyUTYQdL8palwiWMGJO9z77SbQ357blQFs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "lead_id": "={{$json.lead_id}}",
+            "timestamp": "={{$json.timestamp}}",
+            "name": "={{$json.name}}",
+            "email": "={{$json.email}}",
+            "phone": "={{$json.phone}}",
+            "company": "={{$json.company}}",
+            "message": "={{$json.message}}",
+            "budget": "={{$json.budget}}",
+            "source": "={{$json.source}}",
+            "score": "={{$json.score}}",
+            "reason": "={{$json.reason}}",
+            "summary": "={{$json.summary}}",
+            "tags": "={{$json.tags}}"
+          },
+          "matchingColumns": [
+            "lead_id"
+          ],
+          "schema": [
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget",
+              "displayName": "budget",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tags",
+              "displayName": "tags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        976,
+        0
+      ],
+      "id": "7bd347bc-2fcb-46ce-8b27-e0cd6b5d7b21",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "FriXzuE10rjHZzYT",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "-1003736619128",
+        "text": "={{$json.score === 'HOT' ? '🔥' : $json.score === 'WARM' ? '🌤' : '🧊'}} Новий лід — {{$json.score}}  👤 {{$json.name}} 🏢 {{$json.company}} 📧 {{$json.email}} 📞 {{$json.phone}} 💰 Бюджет: {{$json.budget}} USD 🌐 Джерело: {{$json.source}}  📝 {{$json.summary}}  🏷 Теги: {{$json.tags}}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1184,
+        0
+      ],
+      "id": "a9748650-d08d-4795-94c0-ed2c6c00c6c4",
+      "name": "Send a text message",
+      "webhookId": "a251c26a-b321-4132-acb2-e3bb94a2b320",
+      "credentials": {
+        "telegramApi": {
+          "id": "W0YN4t18bA24Ytx8",
+          "name": "Telegram account 4"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c2b2d598-6940-4c91-93e7-0ebfec2ea657",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8fc414538f9a9e75b062104da82c5a546db6fada19d9632bdcff585131446182"
+  },
+  "id": "A0MShW62Czkup59W",
+  "tags": []
+}
