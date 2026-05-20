@@ -1,2 +1,41 @@
-# lead-processing-mvp
-MVP автоматизації обробки лідів: Webhook → Normalize → GPT-4o → Google Sheets → Telegram
+MVP-автоматизація обробки заявок з лендингу на базі n8n.
+
+## Стек
+- **n8n** — оркестрація воркфлоу
+- **OpenAI GPT-4o** — AI summary та класифікація ліда
+- **Google Sheets** — збереження результатів
+- **Telegram Bot** — сповіщення команди
+
+## Схема воркфлоу
+## Що робить система
+1. Приймає POST-запит з формою заявки
+2. Нормалізує дані (email lowercase, телефон +380, бюджет у число)
+3. GPT-4o генерує summary та класифікує ліда (HOT / WARM / COLD)
+4. Записує результат у Google Sheets
+5. Надсилає сповіщення в Telegram з emoji по score
+
+## Тестовий payload
+```json
+{
+  "name": "Олексій Мороз",
+  "email": "OLEKSIY.MOROZ@Gmail.Com",
+  "phone": "380671234567",
+  "company": "TechStart UA",
+  "message": "Потрібна автоматизація обробки лідів з сайту. Зараз робимо все вручну, хочемо підключити CRM і сповіщення в Telegram. Терміново.",
+  "budget": "1500$",
+  "source": "Google Ads"
+}
+```
+
+## Класифікація лідів
+| Score | Критерії |
+|-------|----------|
+| 🔥 HOT | Бюджет > 1000 USD, чіткий запит, є терміновість |
+| 🌤 WARM | Бюджет 300–1000 USD, або запит не до кінця сформований |
+| 🧊 COLD | Бюджет < 300 USD, або розмите повідомлення |
+
+## Запуск
+1. Імпортуй `My workflow 4.json` в n8n
+2. Підключи credentials: OpenAI, Google Sheets, Telegram Bot
+3. Активуй воркфлоу
+4. Надішли POST-запит на Webhook URL
